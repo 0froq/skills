@@ -4,6 +4,23 @@ export interface VendorSkillMeta {
   skills: Record<string, string> // sourceSkillName -> outputSkillName
 }
 
+export interface ComboSkillMeta {
+  /** Repository URL to clone as submodule */
+  source: string
+  /** Output directory name under skills/ */
+  output: string
+  /** User requirements description (inline) */
+  requirements?: string
+  /** Path to requirements file (e.g., 'combos/my-tool.md') */
+  requirementsPath?: string
+  /** Relative path to skills directory in repo (default: 'skills') */
+  skillsDir?: string
+  /** Upstream skill name to adapt (default: output) */
+  upstreamSkill?: string
+  /** Whether this is an official skill */
+  official?: boolean
+}
+
 /**
  * Repositories to clone as submodules and generate skills from source
  */
@@ -67,7 +84,19 @@ export const vendors: Record<string, VendorSkillMeta> = {
 }
 
 /**
- * Hand-written skills with Anthony Fu's preferences/tastes/recommendations
+ * Type 3: Combo skills - hybrid approach with user requirements
+ * Clone repo → check for skills/ → adapt or generate based on requirements
+ */
+export const combos: Record<string, ComboSkillMeta> = {
+  'vueuse-combo': {
+    source: 'https://github.com/vueuse/skills',
+    output: 'vueuse-combo',
+    requirementsPath: 'combos/vueuse-combo.md',
+  },
+}
+
+/**
+ * Type 4: Hand-written skills with Anthony Fu's preferences/tastes/recommendations
  */
 export const manual = [
   'antfu',

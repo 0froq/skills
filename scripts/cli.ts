@@ -1,10 +1,11 @@
+import type { ComboSkillMeta } from '../meta.ts'
 import { execSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import * as p from '@clack/prompts'
-import { manual, submodules, vendors } from '../meta.ts'
+import { combos, manual, submodules, vendors } from '../meta.ts'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const root = join(__dirname, '..')
@@ -58,7 +59,7 @@ function removeSubmodule(submodulePath: string): void {
 interface Project {
   name: string
   url: string
-  type: 'source' | 'vendor'
+  type: 'source' | 'vendor' | 'combo'
   path: string
 }
 
@@ -80,6 +81,12 @@ async function initSubmodules(skipPrompt = false) {
       url: (config as VendorConfig).source,
       type: 'vendor' as const,
       path: `vendor/${name}`,
+    })),
+    ...Object.entries(combos).map(([name, config]) => ({
+      name,
+      url: config.source,
+      type: 'combo' as const,
+      path: `combo/${name}`,
     })),
   ]
 
@@ -266,6 +273,94 @@ async function syncSubmodules() {
     }
   }
 
+  // Sync Type 3: Combo skills
+  for (const [comboName, config] of Object.entries(combos)) {
+    const comboConfig = config as ComboSkillMeta
+    const comboPath = join(root, 'combo', comboName)
+    const skillsDir = comboConfig.skillsDir || 'skills'
+    const upstreamSkill = comboConfig.upstreamSkill || comboConfig.output
+    const sourceSkillPath = join(comboPath, skillsDir, upstreamSkill)
+    const outputPath = join(root, 'skills', comboConfig.output)
+
+    if (!existsSync(comboPath)) {
+      p.log.warn(`Combo submodule not found: ${comboName}. Run init first.`)
+      continue
+    }
+
+    if (!existsSync(sourceSkillPath)) {
+      p.log.warn(`No skills directory found in combo/${comboName}/${skillsDir}/${upstreamSkill}. Generation required.`)
+      // For now, create placeholder directory with COMBO.md
+      if (!existsSync(outputPath)) {
+        mkdirSync(outputPath, { recursive: true })
+      }
+    }
+    else {
+      spinner.start(`Syncing combo skill: ${upstreamSkill} → ${comboConfig.output}`)
+
+      if (existsSync(outputPath)) {
+        rmSync(outputPath, { recursive: true })
+      }
+      mkdirSync(outputPath, { recursive: true })
+
+      // Copy all files from source skill to output
+      const files = readdirSync(sourceSkillPath, { recursive: true, withFileTypes: true })
+      for (const file of files) {
+        if (file.isFile()) {
+          const fullPath = join(file.parentPath, file.name)
+          const relativePath = fullPath.replace(sourceSkillPath, '')
+          const destPath = join(outputPath, relativePath)
+
+          // Ensure destination directory exists
+          const destDir = dirname(destPath)
+          if (!existsSync(destDir)) {
+            mkdirSync(destDir, { recursive: true })
+          }
+
+          cpSync(fullPath, destPath)
+        }
+      }
+
+      // Copy LICENSE file from combo repo root if it exists
+      const licenseNames = ['LICENSE', 'LICENSE.md', 'LICENSE.txt', 'license', 'license.md', 'license.txt']
+      for (const licenseName of licenseNames) {
+        const licensePath = join(comboPath, licenseName)
+        if (existsSync(licensePath)) {
+          cpSync(licensePath, join(outputPath, 'LICENSE.md'))
+          break
+        }
+      }
+
+      spinner.stop(`Synced combo: ${upstreamSkill} → ${comboConfig.output}`)
+    }
+
+    // Create COMBO.md tracking file
+    const sha = getGitSha(comboPath)
+    const comboPathFile = join(outputPath, 'COMBO.md')
+    const date = new Date().toISOString().split('T')[0]
+    const mode = existsSync(sourceSkillPath) ? 'adapt' : 'generate'
+
+    // Read requirements
+    let requirements = comboConfig.requirements
+    if (comboConfig.requirementsPath) {
+      const reqPath = join(root, comboConfig.requirementsPath)
+      if (existsSync(reqPath)) {
+        requirements = readFileSync(reqPath, 'utf-8')
+      }
+    }
+
+    const comboContent = `# Combo Info
+
+- **Source:** \`combo/${comboName}\`
+- **Git SHA:** \`${sha}\`
+- **Requirements:** ${comboConfig.requirementsPath || '(inline)'}
+- **Mode:** ${mode}
+- **Updated:** ${date}
+
+${requirements ? `\n## Requirements\n\n${requirements}\n` : ''}
+`
+    writeFileSync(comboPathFile, comboContent)
+  }
+
   p.log.success('All skills synced')
 }
 
@@ -312,6 +407,20 @@ async function checkUpdates() {
     }
   }
 
+  // Check combos
+  for (const [name, config] of Object.entries(combos)) {
+    const comboConfig = config as ComboSkillMeta
+    const path = join(root, 'combo', name)
+    if (!existsSync(path))
+      continue
+
+    const behind = execSafe('git rev-list HEAD..@{u} --count', path)
+    const count = behind ? Number.parseInt(behind) : 0
+    if (count > 0) {
+      updates.push({ name: `${name} (${comboConfig.output})`, type: 'combo', behind: count })
+    }
+  }
+
   if (updates.length === 0) {
     p.log.success('All submodules are up to date')
   }
@@ -337,6 +446,12 @@ function getExpectedSkillNames(): Set<string> {
     for (const outputName of Object.values(vendorConfig.skills)) {
       expected.add(outputName)
     }
+  }
+
+  // Skills from combos (use the output skill name)
+  for (const config of Object.values(combos)) {
+    const comboConfig = config as ComboSkillMeta
+    expected.add(comboConfig.output)
   }
 
   // Manual skills
@@ -374,6 +489,12 @@ async function cleanup(skipPrompt = false) {
       url: (config as VendorConfig).source,
       type: 'vendor' as const,
       path: `vendor/${name}`,
+    })),
+    ...Object.entries(combos).map(([name, config]) => ({
+      name,
+      url: config.source,
+      type: 'combo' as const,
+      path: `combo/${name}`,
     })),
   ]
 
