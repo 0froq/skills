@@ -13,11 +13,12 @@ Use pnpm workspaces for monorepo management:
 # pnpm-workspace.yaml
 packages:
   - 'packages/*'
+  - 'apps/*'
 ```
 
 ## Scripts Convention
 
-Have scripts in each package, and use `-r` (recursive) flag at root,
+Have scripts in each package, and use `-r` (recursive) flag at root.
 Enable ESLint cache for faster linting in monorepos.
 
 ```json
@@ -26,25 +27,37 @@ Enable ESLint cache for faster linting in monorepos.
   "scripts": {
     "build": "pnpm run -r build",
     "test": "vitest",
-    "lint": "eslint . --cache --concurrency=auto"
+    "lint": "eslint . --cache --concurrency=auto",
+    "lint:fix": "eslint . --cache --concurrency=auto --fix",
+    "dev": "pnpm run -r --parallel dev",
+    "clean": "rm -rf node_modules packages/*/node_modules apps/*/node_modules"
   }
 }
 ```
 
-In each package's `package.json`, add the scripts.
+In each package's `package.json`, add the scripts:
 
 ```json
 // packages/*/package.json
 {
   "scripts": {
     "build": "tsdown",
+    "dev": "tsdown --watch",
     "prepack": "pnpm build"
+  }
+}
+
+// apps/*/package.json
+{
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate"
   }
 }
 ```
 
 ## ESLint Cache
-
 
 ```json
 {
@@ -58,7 +71,28 @@ In each package's `package.json`, add the scripts.
 
 For monorepos with many packages or long build times, use Turborepo for task orchestration and caching.
 
-See the dedicated Turborepo skill for detailed configuration.
+### Configuration
+
+```json
+// turbo.json
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": ["**/.env.*local"],
+  "pipeline": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": [".nuxt/**", ".output/**", "dist/**"]
+    },
+    "lint": {
+      "outputs": []
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    }
+  }
+}
+```
 
 ## Centralized Alias
 
@@ -121,4 +155,54 @@ import { alias } from './alias'
 export default defineNuxtConfig({
   alias,
 })
+```
+
+```ts
+// vitest.config.ts
+import { alias } from './alias'
+
+export default defineConfig({
+  resolve: { alias },
+})
+```
+
+## Package Naming
+
+Use scoped packages for internal packages:
+
+```json
+// packages/core/package.json
+{
+  "name": "@myorg/core",
+  "version": "1.0.0",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts"
+}
+```
+
+## Internal Dependencies
+
+Reference workspace packages with `workspace:` protocol:
+
+```json
+{
+  "dependencies": {
+    "@myorg/core": "workspace:*",
+    "@myorg/utils": "workspace:*"
+  }
+}
+```
+
+## Build Order
+
+pnpm automatically handles build order based on `workspace:` dependencies. No need for manual sequencing.
+
+## Publishing
+
+```bash
+# Version all packages
+pnpm version [major|minor|patch]
+
+# Publish all
+pnpm publish -r
 ```

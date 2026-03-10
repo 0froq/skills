@@ -1,9 +1,9 @@
 ---
-name: antfu
-description: Anthony Fu's opinionated tooling and conventions for JavaScript/TypeScript projects. Use when setting up new projects, configuring ESLint/Prettier alternatives, monorepos, library publishing, or when the user mentions Anthony Fu's preferences.
+name: oq
+description: oQ's opinionated tooling and conventions for JavaScript/TypeScript projects. Based on Anthony Fu's style with personal customizations for UnoCSS, ESLint, pnpm catalog, and automated releases. Use when setting up new projects with these preferences.
 metadata:
-  author: Anthony Fu
-  version: "2026.02.03"
+  author: oQ
+  version: "2026.03.10"
 ---
 
 ## Coding Practices
@@ -78,17 +78,35 @@ metadata:
 
 ### ESLint Setup
 
-```js
-// eslint.config.mjs
+```ts
+// eslint.config.ts
 import antfu from '@antfu/eslint-config'
+import nuxt from './.nuxt/eslint.config.mjs'
 
-export default antfu()
+export default antfu(
+  {
+    unocss: true,
+    pnpm: true,
+    typescript: true,
+    vue: true,
+    rules: {
+      'vue/max-attributes-per-line': ['error', {
+        singleline: { max: 1 },
+        multiline: { max: 1 },
+      }],
+      'unused-imports/no-unused-imports': 'off',
+    },
+    formatters: {
+      css: true,
+      html: true,
+      markdown: 'dprint',
+    },
+  },
+)
+  .append(nuxt())
 ```
 
-
-When completing tasks, run `pnpm run lint --fix` to format the code and fix coding style.
-
-For detailed configuration options: [antfu-eslint-config](references/antfu-eslint-config.md)
+For detailed configuration options: [oq-eslint-config](references/oq-eslint-config.md)
 
 ### Git Hooks
 
@@ -115,7 +133,11 @@ Use named catalogs in `pnpm-workspace.yaml` for version management:
 | `dev` | Dev tools (linter, bundler, testing) |
 | `frontend` | Frontend libraries |
 
-Avoid the default catalog. Catalog names can be adjusted per project needs.
+**Avoid the default catalog.** Catalog names can be adjusted per project needs.
+
+**Additional tools:**
+- Use `pnpm-workspace-utils` for catalog management
+- Use `nip` for interactive package management
 
 ---
 
@@ -123,8 +145,11 @@ Avoid the default catalog. Catalog names can be adjusted per project needs.
 
 | Topic | Description | Reference |
 |-------|-------------|-----------|
-| ESLint Config | Framework support, formatters, rule overrides, VS Code settings | [antfu-eslint-config](references/antfu-eslint-config.md) |
+| ESLint Config | Custom @antfu/eslint-config setup with Vue rules and formatters | [oq-eslint-config](references/oq-eslint-config.md) |
+| UnoCSS Config | Custom UnoCSS setup with fonts, icons, and prefixed attributify | [oq-unocss-config](references/oq-unocss-config.md) |
 | Project Setup | .gitignore, GitHub Actions, VS Code extensions | [setting-up](references/setting-up.md) |
+| Release Workflow | Automated releases with changelogithub | [release-workflow](references/release-workflow.md) |
+| pnpm Catalog | Strict pnpm catalog configuration and tools | [pnpm-catalog](references/pnpm-catalog.md) |
 | App Development | Vue/Nuxt/UnoCSS conventions and patterns | [app-development](references/app-development.md) |
-| Library Development | tsdown bundling, pure ESM publishing | [library-development](references/library-development.md) |
 | Monorepo | pnpm workspaces, centralized alias, Turborepo | [monorepo](references/monorepo.md) |
+| Library Development | tsdown bundling, pure ESM publishing | [library-development](references/library-development.md) |
