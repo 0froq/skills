@@ -1,0 +1,5 @@
+- Focus on core Conventional Commits spec semantics and practical commit patterns; emphasize meaningful commit types and messages.
+- Source: upstream repository https://github.com/conventional-commits/conventionalcommits.org. Follow the official docs as the basis for guidance.
+- Structure guidance: generate a single skill per concept under skills/conventionalcommits/. Create SKILL.md as the index, GENERATION.md with the upstream SHA, and references/*.md files for the concepts.
+- Do not recommend using the type 'chore' in this repo's guidance, as it is often overused; the guidance should avoid implying the spec forbids it, but prefer more specific types when meaningful.
+- The generation should be concise, practical, and oriented toward core spec semantics and how to select commit types for real-world scenarios.
