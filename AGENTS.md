@@ -161,7 +161,7 @@ For projects where you have **specific requirements** and want a hybrid approach
 
 ### Type 4: Hand-written Skills
 
-For skills that are written by Anthony Fu with his preferences, experience, tastes and best practices.
+For skills that are hand-written for this repository's maintainer preferences and best practices.
 
 You don't need to do anything about them unless being asked.
 
@@ -342,12 +342,14 @@ Also record the version of the tool/project when the skills were generated.
 name: {name}
 description: {description}
 metadata:
-  author: Anthony Fu
+  author: froQ
   version: "2026.1.1"
-  source: Generated from {source-url}, scripts located at https://github.com/antfu/skills
+  source: Generated from {source-url}, scripts located at https://github.com/0froq/skills
 ---
 
 > The skill is based on {project} v{version}, generated at {date}.
+
+Use the current repository maintainer as the metadata author for newly generated skills. In this fork, that is `froQ`, not the upstream project author.
 
 // Some concise summary/context/introduction of the project
 

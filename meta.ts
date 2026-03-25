@@ -33,6 +33,7 @@ export const submodules = {
   pinia: 'https://github.com/vuejs/pinia',
   vitest: 'https://github.com/vitest-dev/vitest',
   vitepress: 'https://github.com/vuejs/vitepress',
+  conventionalcommits: 'https://github.com/conventional-commits/conventionalcommits.org',
 }
 
 /**
@@ -96,7 +97,7 @@ export const combos: Record<string, ComboSkillMeta> = {
 }
 
 /**
- * Type 4: Hand-written skills with Anthony Fu's preferences/tastes/recommendations
+ * Type 4: Hand-written skills with project-specific preferences/tastes/recommendations
  */
 export const manual = [
   'antfu',
