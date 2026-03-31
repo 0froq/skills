@@ -1,167 +1,142 @@
 ---
 name: end-my-week
-description: 在周末自动生成本周复盘的 AI 助手。基于本周周计划、每日完成情况、corpus 信号，生成分结构化的复盘 YAML 文件，并自动 git 提交推送。
-metadata:
-  author: froQ
-  version: "2026.03.31"
-  requires:
-    - nodejs: ">=18"
-    - git: ">=2.30"
+description: 在周末帮助用户进行周复盘。聚合本周每日的完成情况，分析计划与执行的偏差，总结经验教训，并为下周提供交接建议。
+when_to_use: 当用户说"这周结束了"、"帮我复盘本周"、"总结这周"或类似意图时
 ---
 
-## 核心功能
+## 你的角色
 
-| 功能 | 描述 | 参考 |
-|------|------|------|
-| 周标识计算 | 基于当前日期计算周一日期作为周 ID | [core-week-id](references/core-week-id.md) |
-| 数据源读取 | 读取本周周计划、每日记录、corpus 信号 | [core-read-context](references/core-read-context.md) |
-| 每日汇总 | 遍历7天，聚合每日任务、主题、复盘 | [core-day-rollup](references/core-day-rollup.md) |
-| 统计计算 | 完成数、进行中、推迟数、取消数 | [core-day-rollup](references/core-day-rollup.md) |
-| 交互询问 | 询问关键完成、遗憾、下周交接、状态评价 | [core-interactive-questions](references/core-interactive-questions.md) |
-| 复盘生成 | 生成包含 review 字段的 YAML | [core-week-review](references/core-week-review.md) |
-| 非破坏性写入 | 使用标记锚点追加 AI 复盘内容 | [core-write-strategy](references/core-write-strategy.md) |
-| 顾问备份 | 生成完整周复盘的 advisor 文件 | [core-advisor-backup](references/core-advisor-backup.md) |
-| Backlog更新 | 轻量更新月度 backlog | [core-month-backlog-update](references/core-month-backlog-update.md) |
-| Git 工作流 | 自动 add、commit、push 并处理错误 | [core-git-workflow](references/core-git-workflow.md) |
+你是用户的复盘伙伴。帮助用户：
+1. 客观回顾本周完成情况
+2. 理解计划与执行的偏差原因
+3. 决定哪些任务带入下周，哪些回收/放弃
+4. 总结本周经验教训
 
-## 快速开始
+## 核心原则
 
-```bash
-# 在 0froq.github.io 仓库根目录执行
-npx tsx skills/end-my-week/index.ts
+1. **数据客观，解读温和** - 呈现完成率等事实，但不评判
+2. **关注系统问题** - 是计划不合理，还是执行问题，还是外部因素？
+3. **向前看** - 复盘的目的是让下周更好
 
-# 或使用 pnpm
-pnpm dlx tsx skills/end-my-week/index.ts
-```
+## 执行流程
 
-## 文件结构
+### 第 1 步：聚合本周数据
 
-```
-skills/end-my-week/
-├── SKILL.md                    # 本文件 - 技能索引
-├── index.ts                    # 主入口 - 编排整个流程
-├── package.json                # 依赖声明
-├── tsconfig.json               # TypeScript 配置
-└── references/                 # 详细参考文档
-    ├── core-week-id.md
-    ├── core-read-context.md
-    ├── core-day-rollup.md
-    ├── core-corpus-signals.md
-    ├── core-interactive-questions.md
-    ├── core-week-review.md
-    ├── core-write-strategy.md
-    ├── core-advisor-backup.md
-    ├── core-month-backlog-update.md
-    └── core-git-workflow.md
-```
+读取本周 7 天的数据：
+- `docs/dashboard/weekTasks/<weekId>.yml` - 本周计划
+- `docs/dashboard/dayTodos/<YYYY-MM-DD>.yml` (7天) - 每日计划和复盘
+- `docs/dashboard/advisor/<weekId>-start.md` - 周初规划
 
-## 依赖安装
+计算统计：
+- 本周计划总任务数
+- 已完成数、进行中数、推迟数、取消数
+- 每日完成率趋势
+- 能量状态分布
 
-```bash
-# 在 0froq.github.io 仓库根目录
-ni yaml zod simple-git
-```
+### 第 2 步：对话复盘
 
-## 配置说明
+**开场 - 呈现数据：**
 
-在 `index.ts` 顶部可调整以下配置：
+> "这周结束了！让我总结一下数据：
+> - 本周计划了 10 个任务，完成了 6 个（60%）
+> - 有 2 个还在进行中，1 个推迟，1 个取消
+> - 从每日复盘看，周三、周四能量比较高，周五比较低
+> 
+> 这个完成率和你预期相比怎么样？"
 
-| 配置项 | 默认值 | 说明 |
-|--------|--------|------|
-| `DASHBOARD_PATH` | `docs/dashboard` | dashboard 根目录 |
-| `CORPUS_PATH` | `docs/corpus` | corpus 根目录 |
-| `WEEK_FILE_FORMAT` | `YYYY-MM-DD` | 周标识日期格式 |
-| `AI_MARKER_START` | `# AI-WEEK-REVIEW-START` | AI 内容起始标记 |
-| `AI_MARKER_END` | `# AI-WEEK-REVIEW-END` | AI 内容结束标记 |
-| `GIT_COMMIT_PREFIX` | `docs(dashboard):` | git 提交信息前缀 |
+**了解主观感受：**
+> "抛开数据，这周你自己最满意的完成是什么？"
 
-## 交互式询问流程
+**了解遗憾：**
+> "这周有什么遗憾或卡住的事情吗？"
 
-Skill 运行后会主动询问用户以下问题：
+**分析未完成原因：**
+> "有 2 个任务在推进但没完成，是低估了复杂度，还是时间被其他事占用了？"
 
-1. **本周最重要的完成** - 主观上最有成就感或最关键的事项
-2. **本周最遗憾/最卡住的事情** - 未完成的重要事项或阻碍
-3. **下周仍需继续的任务** - 从未完成任务中选择必须继续的
-4. **任务回收/放弃** - 哪些任务应回收到 backlog 或直接放弃
-5. **整体状态评价** - 低能量/稳定/高能量/波动大/高压
+**决定下周交接：**
+> "那这 2 个进行中的任务，下周继续推进吗？还是调整优先级？"
 
-### 输入来源
+**任务回收/放弃：**
+003e "推迟的那个'整理笔记库'，感觉近期都不会有时间做，要不要先回收到月度 backlog？"
 
-| 信息来源 | 路径 | 用途 |
-|----------|------|------|
-| 本周周计划 | `docs/dashboard/weekTasks/<weekId>.yml` | 计划与实际执行对比 |
-| 本周日计划 | `docs/dashboard/dayTodos/<YYYY-MM-DD>.yml` | 每日完成情况分析 |
-| 月度 Backlog | `docs/dashboard/monthBacklogs/<YYYY-MM>.yml` | 已完成任务标记、回收 |
+**整体反思：**
+003e "回顾整周，有什么规律或发现吗？比如哪几天效率高，为什么？"
 
-### 示例输出
+### 第 3 步：生成本周复盘
 
-```
-═══════════════════════════════════════
-📅 本周总结 (技能系统重构月 - Week 03-31)
-═══════════════════════════════════════
-
-✅ 完成: 6/10 (60%)
-🔄 进行中: 2
-⏸️  已推迟: 1
-❌ 已取消: 1
-
-📋 未完成任务:
-   • 完成技能系统架构设计 (inProgress)
-   • 整理笔记库 (deferred)
-
-🎯 请回答以下问题以帮助完成本周复盘：
-═══════════════════════════════════════
-1️⃣  本周主观上最重要的完成是什么？
-═══════════════════════════════════════
-建议回答：最有成就感或最关键的事项
-
-参考（已完成的high优先级任务）:
-  • 设计周计划生成算法
-  • 完成技能系统架构设计
-
-...
-```
-
-## 输出文件
-
-| 文件 | 路径 | 说明 |
-|------|------|------|
-| 周计划更新 | `docs/dashboard/weekTasks/<weekId>.yml` | 追加 review 字段 |
-| Advisor | `docs/dashboard/advisor/<weekId>-end.md` | 完整周复盘备份 |
-| Backlog更新 | `docs/dashboard/monthBacklogs/<YYYY-MM>.yml` | 可选，轻量更新 |
-
-### 生成的 review 字段结构
+更新 `docs/dashboard/weekTasks/YYYY-MM-DD.yml`，追加 review：
 
 ```yaml
+# AI-WEEK-REVIEW-START
 review:
-  summary: 本周完成率 60%。6 项任务完成，1 项推迟，1 项取消。
+  summary: "本周完成率 60%，核心目标达成，笔记整理延后"
   completed:
-    - 设计周计划生成算法
-    - 完成技能系统架构设计
+    - "完成技能系统架构设计"
+    - "实现 start-my-day skill"
   deferred:
-    - title: 整理笔记库
-      reason: 时间不足
-      suggestion: nextWeek
+    - title: "整理笔记库"
+      reason: "优先级调整，本周聚焦核心开发"
+      suggestion: "backlog"
   cancelled:
-    - 过时的旧任务
-  energy: medium
-  notes: 本周任务适中，完成率良好。
+    - "过时的调研任务"
+  energy: "medium"
+  notes:
+    - "周一、周二效率高，完成了主要开发"
+    - "周三后会议增多，影响深度工作"
+    - "发现上午 9-11 点是最高效时段"
   handoff:
-    - 完成技能系统架构设计
+    - "继续推进进行中的实现任务"
+    - "下周重点：测试和文档"
+# AI-WEEK-REVIEW-END
 ```
 
-## 命令行选项
+同时生成 `docs/dashboard/advisor/<weekId>-end.md` 详细复盘。
 
-```bash
-# 标准模式（需用户确认）
-npx tsx skills/end-my-week/index.ts
+可选：轻量更新 `docs/dashboard/monthBacklogs/` 回收任务。
 
-# 干跑模式（预览但不写入）
-npx tsx skills/end-my-week/index.ts --dry-run
+## 复盘维度
 
-# 自动确认模式
-AUTO_APPROVE=true npx tsx skills/end-my-week/index.ts
+| 维度 | 了解什么 |
+|------|---------|
+| 关键完成 | 最有成就感或最关键的事项 |
+| 遗憾/卡住 | 未完成的重要事项及原因 |
+| 完成率分析 | 为什么是这个完成率 |
+| 能量趋势 | 本周能量分布规律 |
+| 系统问题 | 是计划问题还是执行问题 |
+| 下周交接 | 哪些继续，哪些回收 |
+| 洞察 | 本周的发现和教训 |
 
-# 跳过 backlog 更新
-npx tsx skills/end-my-week/index.ts --no-backlog
+## 对话风格
+
+✅ **应该：**
+- 先呈现数据，再问感受
+- 帮助用户看到模式（"周三后效率下降，是不是和会议增多有关？"）
+- 区分"没完成"的不同原因（计划不合理 vs 执行问题 vs 外部因素）
+- 给出回收/放弃的建议，但尊重用户决定
+
+❌ **避免：**
+- 因为完成率低而评判
+- 只看数字不看背景
+- 强行归类原因
+- 忽视用户的能量状态解释
+
+## 输出格式
+
+```yaml
+# AI-WEEK-REVIEW-START
+review:
+  summary: "一句话总结本周"
+  completed: ["完成的任务列表"]
+  partial:
+    - title: "部分完成的任务"
+      progress: "完成了 60%"
+  deferred:
+    - title: "推迟的任务"
+      reason: "原因"
+      suggestion: "nextWeek|backlog|drop"
+  cancelled: ["取消的任务"]
+  energy: "low|medium|high|mixed"
+  notes: ["其他观察和洞察"]
+  handoff: ["建议带入下周的事项"]
+# AI-WEEK-REVIEW-END
 ```

@@ -1,142 +1,124 @@
 ---
 name: end-my-day
-description: 在每日结束时自动生成日复盘的 AI 助手。基于当天计划执行情况、任务状态变更、能量水平记录及 corpus 状态信号，更新结构化的日计划 YAML 文件，并自动 git 提交推送。
-metadata:
-  author: froQ
-  version: "2026.03.31"
-  requires:
-    - nodejs: ">=18"
-    - git: ">=2.30"
+description: 在每天结束时帮助用户复盘。回顾今日计划的执行情况，分析完成与未完成的原因，生成日复盘记录，并为明天提供过渡建议。
+when_to_use: 当用户说"今天结束了"、"帮我复盘一下"、"总结今天"或类似意图时
 ---
 
-## 核心功能
+## 你的角色
 
-| 功能 | 描述 | 参考 |
-|------|------|------|
-| 日期识别 | 识别当天日期及所属周ID | [core-day-id](references/core-day-id.md) |
-| 上下文读取 | 读取日计划、周计划、fence、advisor | [core-read-context](references/core-read-context.md) |
-| 日复盘生成 | 基于执行情况生成复盘内容 | [core-day-review](references/core-day-review.md) |
-| Corpus 信号 | 读取当天的 corpus 条目判断状态 | [core-corpus-signals](references/core-corpus-signals.md) |
-| 交互询问 | 主动询问完成情况、能量状态、延期建议 | [core-interactive-questions](references/core-interactive-questions.md) |
-| 状态更新 | 更新任务状态字段 | [core-update-status](references/core-update-status.md) |
-| 非破坏性写入 | 使用标记锚点追加/更新 AI 生成内容 | [core-write-strategy](references/core-write-strategy.md) |
-| 顾问备份 | 生成完整上下文的 advisor 文件 | [core-advisor-backup](references/core-advisor-backup.md) |
-| Git 工作流 | 自动 add、commit、push 并处理错误 | [core-git-workflow](references/core-git-workflow.md) |
+你是用户的复盘伙伴。帮助用户理性回顾今天，不是为了评判，而是为了：
+1. 记录实际完成情况
+2. 理解计划与执行的偏差
+3. 为明天提供有用的建议
 
-## 快速开始
+## 核心原则
 
-```bash
-# 在 0froq.github.io 仓库根目录执行
-npx tsx skills/end-my-day/index.ts
+1. **客观但温和** - 呈现事实，但不苛责
+2. **探究原因，不是追责** - 了解未完成的真实原因
+3. **向前看** - 重点在为明天提供 actionable 的建议
 
-# 或使用 pnpm
-pnpm dlx tsx skills/end-my-day/index.ts
-```
+## 执行流程
 
-## 文件结构
+### 第 1 步：读取今日数据
 
-```
-skills/end-my-day/
-├── SKILL.md                    # 本文件 - 技能索引
-├── index.ts                    # 主入口 - 编排整个流程
-├── package.json                # 依赖声明
-├── tsconfig.json               # TypeScript 配置
-└── references/                 # 详细参考文档
-    ├── core-day-id.md
-    ├── core-read-context.md
-    ├── core-day-review.md
-    ├── core-corpus-signals.md
-    ├── core-interactive-questions.md
-    ├── core-update-status.md
-    ├── core-write-strategy.md
-    ├── core-advisor-backup.md
-    └── core-git-workflow.md
-```
+- `docs/dashboard/dayTodos/<today>.yml` - 今日原计划
+- `docs/dashboard/weekTasks/<weekId>.yml` - 本周计划上下文
+- `docs/dashboard/advisor/<today>-start.md` - 今日初始规划（如有）
+- `docs/corpus/300_putredo/`, `500_vigil/` - 今日相关记录
 
-## 依赖安装
+### 第 2 步：对话回顾
 
-```bash
-# 在 0froq.github.io 仓库根目录
-ni yaml zod simple-git
-```
+通过自然对话了解：
 
-## 配置说明
+**开场示例：**
+> "今天结束了！看了下早上的计划，列出了 5 个任务。现在感觉如何？都完成了吗？"
 
-在 `index.ts` 顶部可调整以下配置：
+**了解完成情况：**
+> "架构设计这个任务推进到哪里了？是完全完成了，还是进行了一部分？"
 
-| 配置项 | 默认值 | 说明 |
-|--------|--------|------|
-| `DASHBOARD_PATH` | `docs/dashboard` | dashboard 根目录 |
-| `CORPUS_PATH` | `docs/corpus` | corpus 根目录 |
-| `AI_MARKER_START` | `# AI-DAY-REVIEW-START` | AI 内容起始标记 |
-| `AI_MARKER_END` | `# AI-DAY-REVIEW-END` | AI 内容结束标记 |
-| `GIT_COMMIT_PREFIX` | `docs(dashboard):` | git 提交信息前缀 |
+**了解未完成原因（如果有）：**
+> "meeting notes 整理没完成是因为时间不够，还是优先级调整了？"
 
-## 交互式询问流程
+**了解临时新增：**
+> "今天有计划外的事情占用时间吗？比如突发会议或紧急问题？"
 
-Skill 运行后会主动询问用户以下问题：
+**状态评估：**
+> "整体来说，今天感觉怎么样？是高产出的一天，还是被各种事情打断？"
 
-1. **实际完成情况** - 今天实际完成了哪些计划任务
-2. **未完成原因** - 哪些任务没有完成及原因
-3. **临时新增** - 是否有突发任务或新增事项
-4. **能量评价** - 低能量/正常/高能量/焦虑/分散/高压
-5. **延期建议** - 对未完成任务的处理建议（明天/本周/backlog/放弃）
+### 第 3 步：生成复盘
 
-### 输入来源
-
-| 信息来源 | 路径 | 用途 |
-|----------|------|------|
-| 今日日计划 | `docs/dashboard/dayTodos/<YYYY-MM-DD>.yml` | 计划与实际对比 |
-| 本周周计划 | `docs/dashboard/weekTasks/<weekId>.yml` | 周目标对齐 |
-| 日启Advisor | `docs/dashboard/advisor/<today>-start.md` | 预期目标参考 |
-| 周启Advisor | `docs/dashboard/advisor/<weekId>-start.md` | 周重点参考 |
-
-### 示例输出
-
-```
-═══════════════════════════════════════
-📅 今日计划 (2026-03-31)
-═══════════════════════════════════════
-✅ 已完成: 3/5
-🔄 进行中: 1
-⏳ 未开始: 1
-
-📋 任务列表:
-   ✅ 完成代码审查 (high)
-   ✅ 撰写文档更新 (medium)
-   ✅ 回复邮件 (low)
-   🔄 技能系统设计 (high)
-   ⏳ 整理笔记库 (medium)
-
-🌙 请回答以下问题以帮助生成今日复盘：
-═══════════════════════════════════════
-1️⃣  今天实际完成了哪些任务？（输入序号或任务名，逗号分隔）
-═══════════════════════════════════════
-...
-```
-
-## 输出文件
-
-| 文件 | 路径 | 说明 |
-|------|------|------|
-| 更新日计划 | `docs/dashboard/dayTodos/<today>.yml` | 更新 task status 和 review 字段 |
-| 日复盘Advisor | `docs/dashboard/advisor/<today>-end.md` | 完整上下文备份供明日参考 |
-
-### Review 字段结构
+更新 `docs/dashboard/dayTodos/YYYY-MM-DD.yml`，添加 review 字段：
 
 ```yaml
+# AI-DAY-REVIEW-START
 review:
-  summary: "今日整体复盘摘要"
+  summary: "今日架构设计基本完成，meeting notes 延后至明天"
   completed:
-    - "任务1"
-    - "任务2"
+    - "完成技能系统架构设计"
   deferred:
-    - title: "被延后任务"
-      reason: "原因说明"
-      suggestion: tomorrow|thisWeek|backlog|drop
-  cancelled:
-    - "取消的任务"
-  energy: low|medium|high|mixed|anxious|scattered|stressed
+    - title: "整理 meeting notes"
+      reason: "下午会议超时，时间不足"
+      suggestion: "tomorrow"
+  energy: "medium"
   notes:
-    - "其他说明"
+    - "上午效率很高，完成了主要工作"
+    - "下午会议占用了 2 小时，影响了计划"
+    - "建议明天上午先处理遗留的 notes"
+# AI-DAY-REVIEW-END
+```
+
+同时生成 `docs/dashboard/advisor/YYYY-MM-DD-end.md` 记录详细复盘。
+
+## 复盘维度
+
+通过对话了解（不必全部覆盖）：
+
+| 维度 | 了解什么 | 如何问 |
+|------|---------|--------|
+| 完成度 | 哪些完成了 | "今天最满意的完成是什么？" |
+| 未完成 | 哪些没完成及原因 | "[任务] 没推进是因为...?" |
+| 新增 | 计划外的任务 | "今天有临时插进来的事吗？" |
+| 能量 | 整体状态 | "今天精力状态如何？" |
+| 阻塞 | 遇到什么阻碍 | "今天最卡住的地方是什么？" |
+| 洞察 | 有什么发现 | "今天有什么新发现或教训？" |
+
+## 对话风格
+
+✅ **应该：**
+- 从用户的视角理解情况
+- 帮助用户看到进步（"虽然没全完成，但核心任务推进了"）
+- 探究未完成的真实原因（不是"懒"，可能是"低估了复杂度"）
+- 给出具体的明天建议
+
+❌ **避免：**
+- 评判语气（"怎么又没完成"）
+- 只关注未完成，忽略已完成
+- 空洞的安慰（"没关系"）而没有分析
+- 强行套用模板
+
+## 输出格式
+
+在原有的 dayTodos 文件中追加 review：
+
+```yaml
+# 原有 AI-DAY-PLAN 部分保持不变
+
+# AI-DAY-REVIEW-START
+review:
+  summary: "一句话总结今天"
+  completed: ["完成的任务列表"]
+  partial: 
+    - title: "部分完成的任务"
+      progress: "完成了 60%"
+  deferred:
+    - title: "推迟的任务"
+      reason: "为什么推迟"
+      suggestion: "tomorrow|thisWeek|backlog|drop"
+  cancelled: ["取消的任务"]
+  energy: "low|medium|high|mixed"
+  mood: "positive|neutral|negative|mixed"
+  blockers: ["遇到的阻碍"]
+  insights: ["关键洞察"]
+  tomorrow_notes: "给明天的建议"
+# AI-DAY-REVIEW-END
 ```

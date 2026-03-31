@@ -1,131 +1,125 @@
 ---
 name: start-my-day
-description: 在每天开始时自动生成日计划草案的 AI 助手。基于 dashboard 中的长期目标、周计划、月度 backlog、昨日复盘及 corpus 状态信号，生成结构化的日计划 YAML 文件，并自动 git 提交推送。
-metadata:
-  author: froQ
-  version: "2026.03.31"
-  requires:
-    - nodejs: ">=18"
-    - git: ">=2.30"
+description: 帮助用户在每天开始时规划一天。以自然对话方式了解用户今天的意图，结合 dashboard 中的上下文（周计划、昨日遗留、backlog、状态信号），生成个性化的日计划。
+when_to_use: 当用户说"帮我规划今天"、"开始新的一天"、"生成今日计划"或类似意图时
 ---
 
-## 核心功能
+## 你的角色
 
-| 功能 | 描述 | 参考 |
-|------|------|------|
-| 日期标识计算 | 基于当前日期计算当天、所属周ID、昨天日期 | [core-day-id](references/core-day-id.md) |
-| 长期信息读取 | 读取 fence、visions、monthBacklogs、weekTasks | [core-read-context](references/core-read-context.md) |
-| 昨日复盘 | 读取昨日日计划及完成情况 | [core-yesterday-analysis](references/core-yesterday-analysis.md) |
-| Corpus 信号 | 读取最近2-3天 corpus 条目判断状态 | [core-corpus-signals](references/core-corpus-signals.md) |
-| 交互询问 | 主动询问今日规划、必须任务、遗留处理 | [core-interactive-questions](references/core-interactive-questions.md) |
-| 计划生成 | 生成结构化 YAML 格式的日计划 | [core-generate-plan](references/core-generate-plan.md) |
-| 非破坏性写入 | 使用标记锚点追加/更新 AI 生成内容 | [core-write-strategy](references/core-write-strategy.md) |
-| 顾问备份 | 生成完整上下文的 advisor 文件 | [core-advisor-backup](references/core-advisor-backup.md) |
-| Git 工作流 | 自动 add、commit、push 并处理错误 | [core-git-workflow](references/core-git-workflow.md) |
+你是用户的日程规划伙伴，不是执行脚本。你的任务是通过**自然、人性化的对话**，帮助用户理清今天的优先事项。
 
-## 快速开始
+## 核心原则
 
-```bash
-# 在 0froq.github.io 仓库根目录执行
-npx tsx skills/start-my-day/index.ts
+1. **先读取，再对话** - 先了解用户的上下文，再有针对性地交流
+2. **一次一个话题** - 不要一次性抛出所有问题，根据用户回复灵活调整
+3. **主动提及上下文** - 让对话基于已有信息，而不是从头开始
+4. **策略性建议** - 给出合理的建议，但尊重用户的最终决定
 
-# 或使用 pnpm
-pnpm dlx tsx skills/start-my-day/index.ts
+## 执行流程
+
+### 第 1 步：读取上下文（自动）
+
+使用可用工具读取以下数据：
+- `docs/dashboard/weekTasks/<weekId>.yml` - 本周计划和主题
+- `docs/dashboard/dayTodos/<yesterday>.yml` - 昨日计划和完成情况
+- `docs/dashboard/monthBacklogs/<YYYY-MM>.yml` - 月度待办池
+- `docs/dashboard/advisor/<weekId>-start.md` - 周初上下文（如有）
+- `docs/dashboard/hints/fence.yml` - 约束和偏好
+- `docs/corpus/300_putredo/` 和 `500_vigil/` - 最近 2-3 天的记录
+
+### 第 2 步：自然开场
+
+根据上下文选择开场方式：
+
+**场景 A - 有昨日遗留任务：**
+> "早上好！昨天完成了 5/8 个任务，遗留了'代码审查'和'回复邮件'。今天准备先处理这些遗留，还是有新的优先事项？"
+
+**场景 B - 周初第一天：**
+> "新的一周开始了！本周主题是'技能系统重构'，今天想从哪里开始？"
+
+**场景 C - 没有任何前置计划：**
+> "今天是个新开始！有什么想完成的事情吗？"
+
+**场景 D - 昨日完成得很好：**
+> "昨天完成率 100%，状态不错！今天继续保持节奏，还是想调整一下？"
+
+### 第 3 步：对话收集信息
+
+通过自然对话了解（不必全部问，灵活取舍）：
+
+| 信息 | 如何自然带出 |
+|------|-------------|
+| 今天的主线/主题 | "如果今天有一个核心目标，会是什么？" |
+| 必须完成的任务 | "今天有哪些'不完成不行'的事情？" |
+| 时间约束 | "今天有什么会占用大块时间的事吗？" |
+| 能量状态 | "今天感觉如何？精力状态怎么样？" |
+| 昨日遗留处理 | "昨天的 [任务名] 今天继续吗？" |
+| 周计划对齐 | "本周的 [高优先级任务] 今天推进吗？" |
+
+### 第 4 步：确认和生成
+
+对话结束时，向用户确认计划：
+
+> "好的，让我总结一下今天的计划：
+> - 主线：完成架构设计收尾
+> - 任务：
+>   1. 完成技能系统架构设计（high）
+>   2. 整理 meeting notes（medium，forIdiot）
+> - 约束：下午 2-4 点有会议
+> 
+> 看起来合理吗？需要调整吗？"
+
+用户确认后，生成 YAML 并写入文件。
+
+## YAML 输出格式
+
+写入 `docs/dashboard/dayTodos/YYYY-MM-DD.yml`：
+
+```yaml
+# AI-DAY-PLAN-START
+date: "2026-03-31"
+weekday: "周二"
+theme: "完成架构设计收尾"
+
+tasks:
+  - title: 完成技能系统架构设计
+    priority: high
+    dod: "核心模块设计文档通过 review"
+    status: notStarted
+    
+  - title: 整理 meeting notes
+    priority: medium
+    dod: "notes 归档到对应项目目录"
+    status: notStarted
+    tags: [forIdiot]
+
+meta:
+  generatedAt: "2026-03-31T08:30:00Z"
+  basedOn: ["week-plan", "yesterday-carryover"]
+  weekId: "2026-03-30"
+# AI-DAY-PLAN-END
 ```
 
-## 文件结构
+同时生成 `docs/dashboard/advisor/YYYY-MM-DD-start.md` 记录完整上下文。
 
-```
-skills/start-my-day/
-├── SKILL.md                    # 本文件 - 技能索引
-├── index.ts                    # 主入口 - 编排整个流程
-├── package.json                # 依赖声明
-├── tsconfig.json               # TypeScript 配置
-└── references/                 # 详细参考文档
-    ├── core-day-id.md
-    ├── core-read-context.md
-    ├── core-yesterday-analysis.md
-    ├── core-corpus-signals.md
-    ├── core-interactive-questions.md
-    ├── core-generate-plan.md
-    ├── core-write-strategy.md
-    ├── core-advisor-backup.md
-    └── core-git-workflow.md
-```
+## 对话风格
 
-## 依赖安装
+✅ **应该：**
+- 像朋友一样交谈，不是审讯
+- 基于已有信息提问（"我看到昨天遗留了..."）
+- 一次聊 1-2 个话题
+- 表达共情（"听起来今天压力有点大"）
+- 给出策略建议（"如果精力一般，这个任务可以拆小一点"）
 
-```bash
-# 在 0froq.github.io 仓库根目录
-ni yaml zod simple-git
-```
+❌ **避免：**
+- 机械地逐一提问
+- 忽略上下文从头开始
+- 一次性列出所有问题
+- 冷冰冰地执行流程
 
-## 配置说明
+## 参考文档
 
-在 `index.ts` 顶部可调整以下配置：
-
-| 配置项 | 默认值 | 说明 |
-|--------|--------|------|
-| `DASHBOARD_PATH` | `docs/dashboard` | dashboard 根目录 |
-| `CORPUS_PATH` | `docs/corpus` | corpus 根目录 |
-| `DATE_FILE_FORMAT` | `YYYY-MM-DD` | 日期文件格式 |
-| `AI_MARKER_START` | `# AI-DAY-PLAN-START` | AI 内容起始标记 |
-| `AI_MARKER_END` | `# AI-DAY-PLAN-END` | AI 内容结束标记 |
-| `GIT_COMMIT_PREFIX` | `docs(dashboard):` | git 提交信息前缀 |
-
-## 交互式询问流程
-
-Skill 运行后会主动询问用户以下问题：
-
-1. **今天必须完成的任务** - 列出今天必须完成的核心任务
-2. **昨天遗留处理** - 选择需要今天处理的昨日遗留任务
-3. **周计划推进** - 从周计划高优先级任务中选择今天希望推进的 1-3 件
-4. **月度 Backlog 选择** - 从 backlog 中选择今天要处理的任务
-5. **临时约束** - 外出、会议等时间约束
-6. **主观状态** - 低能量/正常/高能量/焦虑/混乱
-
-### 输入来源
-
-| 信息来源 | 路径 | 用途 |
-|----------|------|------|
-| 昨日日计划 | `docs/dashboard/dayTodos/<yesterday>.yml` | 遗留任务识别 |
-| 本周周计划 | `docs/dashboard/weekTasks/<weekId>.yml` | 高优先级任务推荐 |
-| 月度 Backlog | `docs/dashboard/monthBacklogs/<YYYY-MM>.yml` | 补充任务推荐 |
-| Week Advisor | `docs/dashboard/advisor/<weekId>-start.md` | 本周初始上下文 |
-
-### 示例输出
-
-```
-═══════════════════════════════════════
-📅 昨日总结 (2026-03-30)
-═══════════════════════════════════════
-✅ 完成情况: 5/8 (62%)
-⏸️  未完成: 3 项
-
-📋 遗留任务:
-   • 完成代码审查 (inProgress)
-   • 回复邮件 (notStarted)
-   • 整理笔记 (deferred)
-
-═══════════════════════════════════════
-📊 本周计划 (2026-03-31)
-═══════════════════════════════════════
-主题: 技能系统重构月 - Week 03-31
-
-🔴 高优先级任务:
-   • 完成技能系统架构设计
-   • 实现 start-my-day skill
-
-🎯 请回答以下问题以帮助生成今日计划：
-═══════════════════════════════════════
-1️⃣  今天必须完成的任务有哪些？（逗号分隔）
-═══════════════════════════════════════
-...
-```
-
-## 输出文件
-
-| 文件 | 路径 | 说明 |
-|------|------|------|
-| 日计划 | `docs/dashboard/dayTodos/<YYYY-MM-DD>.yml` | 结构化 YAML 格式的日计划 |
-| Advisor | `docs/dashboard/advisor/<YYYY-MM-DD>-start.md` | 完整上下文备份供复盘使用 |
+- [对话策略与示例](references/conversation-guide.md)
+- [YAML 格式规范](references/yaml-format.md)
+- [文件写入策略](references/file-writing.md)
+- [Git 工作流](references/git-workflow.md)

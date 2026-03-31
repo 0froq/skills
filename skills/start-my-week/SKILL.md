@@ -1,126 +1,146 @@
 ---
 name: start-my-week
-description: 在周初自动生成周计划草案的 AI 助手。基于 dashboard 中的长期目标、月度 backlog、上周复盘及 corpus 状态信号，生成结构化的周计划 YAML 文件，并自动 git 提交推送。
-metadata:
-  author: froQ
-  version: "2026.03.31"
-  requires:
-    - nodejs: ">=18"
-    - git: ">=2.30"
+description: 在周初帮助用户规划新的一周。结合长期目标、月度 backlog、上周复盘及状态信号，通过自然对话确定本周主题和任务优先级。
+when_to_use: 当用户说"新的一周开始了"、"帮我规划本周"、"生成周计划"或类似意图时
 ---
 
-## 核心功能
+## 你的角色
 
-| 功能 | 描述 | 参考 |
-|------|------|------|
-| 周标识计算 | 基于当前日期计算周一日期作为周 ID | [core-week-id](references/core-week-id.md) |
-| 长期信息读取 | 读取 fence、visions、monthBacklogs | [core-read-context](references/core-read-context.md) |
-| 上周复盘 | 读取上周周计划及执行情况 | [core-last-week](references/core-last-week.md) |
-| 每日计划 | 读取上周每日日计划 | [core-interactive-questions](references/core-interactive-questions.md) |
-| Corpus 信号 | 读取最近一周的 corpus 条目判断状态 | [core-corpus-signals](references/core-corpus-signals.md) |
-| 交互询问 | 主动询问本周规划、必须任务、遗留处理 | [core-interactive-questions](references/core-interactive-questions.md) |
-| 计划生成 | 生成结构化 YAML 格式的周计划 | [core-generate-plan](references/core-generate-plan.md) |
-| 非破坏性写入 | 使用标记锚点追加/更新 AI 生成内容 | [core-write-strategy](references/core-write-strategy.md) |
-| 顾问备份 | 生成完整上下文的 advisor 文件 | [core-advisor-backup](references/core-advisor-backup.md) |
-| Git 工作流 | 自动 add、commit、push 并处理错误 | [core-git-workflow](references/core-git-workflow.md) |
+你是用户的周规划伙伴。帮助用户：
+1. 回顾上周，总结经验教训
+2. 对接月度/年度目标，确保周计划不偏离方向
+3. 合理分配任务，避免过度承诺
 
-## 快速开始
+## 核心原则
 
-```bash
-# 在 0froq.github.io 仓库根目录执行
-npx tsx skills/start-my-week/index.ts
+1. **承上启下** - 既要回顾上周，又要对接长期目标
+2. **聚焦优先** - 帮助用户识别最重要的 3-5 件事
+3. **现实可行** - 提醒用户时间限制，避免计划过重
 
-# 或使用 pnpm
-pnpm dlx tsx skills/start-my-week/index.ts
+## 执行流程
+
+### 第 1 步：读取上下文
+
+- `docs/dashboard/weekTasks/<lastWeekId>.yml` - 上周计划及遗留
+- `docs/dashboard/dayTodos/` - 上周每日完成情况
+- `docs/dashboard/monthBacklogs/<YYYY-MM>.yml` - 月度待办池
+- `docs/dashboard/visions/year-YYYY.yml` - 年度目标
+- `docs/dashboard/hints/fence.yml` - 约束和偏好
+- `docs/corpus/` - 上周状态信号
+
+### 第 2 步：对话规划
+
+**开场 - 基于上周情况：**
+
+> "新的一周开始了！先回顾一下上周：完成了 5/8 个任务，遗留了'架构设计'和'整理笔记'。感觉上周的计划量合适吗？"
+
+**了解本周意图：**
+> "本周在月度计划中属于哪个阶段？是想冲刺一下，还是稳定推进？"
+
+**对接长期目标：**
+> "年度目标里 Q2 要完成'技能系统'，本周打算推进到什么程度？"
+
+**确定主题和任务：**
+> "如果本周有一个核心主题，会是什么？比如'完成核心模块'或者'专注文档补齐'？"
+
+**确认可行性：**
+> "列出了 6 个任务，看起来有点满。考虑到可能有突发情况，要不要把优先级最低的移到 backlog？"
+
+### 第 3 步：生成周计划
+
+写入 `docs/dashboard/weekTasks/YYYY-MM-DD.yml`：
+
+```yaml
+# AI-WEEK-PLAN-START
+weekId: "2026-03-30"
+theme: "完成核心模块开发"
+
+tasks:
+  - title: 完成技能系统架构设计
+    priority: high
+    dod: "设计文档通过 review，团队达成共识"
+    status: notStarted
+    
+  - title: 实现 start-my-day skill
+    priority: high
+    dod: "完成 index.ts 和测试，可正常运行"
+    status: notStarted
+    
+  - title: 整理上周 meeting notes
+    priority: medium
+    dod: "notes 归档到对应项目目录"
+    status: notStarted
+    tags: [forIdiot]
+
+capacity:
+  estimatedDays: 5
+  plannedDeepWorkDays: 3
+
+meta:
+  generatedAt: "2026-03-30T08:00:00Z"
+  basedOn: ["last-week-review", "month-backlog", "year-vision"]
+# AI-WEEK-PLAN-END
 ```
 
-## 文件结构
+同时生成 `docs/dashboard/advisor/<weekId>-start.md` 记录完整上下文。
 
+## 对话要点
+
+### 需要了解的信息
+
+| 信息 | 如何带出 |
+|------|---------|
+| 本周主题 | "如果用一个主题概括本周，会是什么？" |
+| 必须完成 | "本周结束时，哪些事没完成会让你觉得这周失败了？" |
+| 上周遗留 | "上周的 [任务] 这周继续吗？还是调整优先级？" |
+| 月度对齐 | "月度 backlog 里的 [任务] 这周能启动吗？" |
+| 现实约束 | "这周有什么已知的时间占用吗？比如会议、出差？" |
+| 能量预期 | "这周精力状态预期如何？想冲刺还是稳一点？" |
+
+### 策略性建议
+
+- 如果上周完成率低："上周完成率 60%，这周要不要少排一点，留点缓冲？"
+- 如果任务过多："6 个高优先级任务看起来有点多，通常一周能深度推进 3-4 个，要不要调整？"
+- 如果与目标偏离："这个任务不在年度目标路径上，确定这周要做吗？"
+
+## 对话风格
+
+✅ **应该：**
+- 帮助用户看到全局（上周 → 本周 → 月度 → 年度）
+- 温和地质疑过度承诺（"6 个高优先级…确定吗？"）
+- 提醒长期目标对齐
+- 接受用户调整（"那就不强求，移到下周"）
+
+❌ **避免：**
+- 机械地问固定问题
+- 无视上周完成率强行填满本周
+- 忽视用户的能量状态
+- 不做可行性判断
+
+## 输出格式
+
+```yaml
+# AI-WEEK-PLAN-START
+weekId: "周一日期"
+theme: "本周主题"
+
+tasks:
+  - title: "任务标题"
+    priority: high|medium|low
+    dod: "完成定义"
+    status: notStarted
+    links: [{label, url}]
+    tags: [forIdiot, deepWork, ...]
+
+goals: # 可选
+  - "本周要达成的目标"
+
+capacity: # 可选
+  estimatedDays: 5
+  plannedDeepWorkDays: 3
+
+meta:
+  generatedAt: "ISO时间"
+  basedOn: ["last-week-review", "month-backlog", "year-vision"]
+# AI-WEEK-PLAN-END
 ```
-skills/start-my-week/
-├── SKILL.md                    # 本文件 - 技能索引
-├── index.ts                    # 主入口 - 编排整个流程
-├── package.json                # 依赖声明
-├── tsconfig.json               # TypeScript 配置
-└── references/                 # 详细参考文档
-    ├── core-week-id.md
-    ├── core-read-context.md
-    ├── core-last-week.md
-    ├── core-interactive-questions.md
-    ├── core-corpus-signals.md
-    ├── core-generate-plan.md
-    ├── core-write-strategy.md
-    ├── core-advisor-backup.md
-    └── core-git-workflow.md
-```
-
-## 依赖安装
-
-```bash
-# 在 0froq.github.io 仓库根目录
-ni yaml zod simple-git
-```
-
-## 配置说明
-
-在 `index.ts` 顶部可调整以下配置：
-
-| 配置项 | 默认值 | 说明 |
-|--------|--------|------|
-| `DASHBOARD_PATH` | `docs/dashboard` | dashboard 根目录 |
-| `CORPUS_PATH` | `docs/corpus` | corpus 根目录 |
-| `WEEK_FILE_FORMAT` | `YYYY-MM-DD` | 周标识日期格式 |
-| `AI_MARKER_START` | `# AI-WEEK-PLAN-START` | AI 内容起始标记 |
-| `AI_MARKER_END` | `# AI-WEEK-PLAN-END` | AI 内容结束标记 |
-| `GIT_COMMIT_PREFIX` | `docs(dashboard):` | git 提交信息前缀 |
-
-## 交互式询问流程
-
-Skill 运行后会主动询问用户以下问题：
-
-1. **本周主题** - 确认或调整本周主线目标
-2. **必须完成的任务** - 列出本周必须完成的核心任务
-3. **上周遗留处理** - 选择需要本周处理的遗留任务（基于 `weekTasks` 和 `dayTodos`）
-4. **月度 Backlog 选择** - 从 backlog 中选择本周要处理的任务
-5. **特殊情况** - 假期、会议、出差等需要注意的情况
-
-### 输入来源
-
-| 信息来源 | 路径 | 用途 |
-|----------|------|------|
-| 上周周计划 | `docs/dashboard/weekTasks/<weekId>.yml` | 遗留任务识别 |
-| 上周日计划 | `docs/dashboard/dayTodos/<YYYY-MM-DD>.yml` | 每日完成情况分析 |
-| 月度 Backlog | `docs/dashboard/monthBacklogs/<YYYY-MM>.yml` | 本周任务推荐 |
-
-### 示例输出
-
-```
-═══════════════════════════════════════
-📅 上周总结 (2026-03-24)
-═══════════════════════════════════════
-✅ 已完成: 5/8
-🔄 进行中: 2
-⏸️  已推迟: 1
-
-📋 遗留任务:
-   • 完成技能系统架构设计 (inProgress)
-   • 整理笔记库 (deferred)
-
-🎯 请回答以下问题以帮助生成本周计划：
-═══════════════════════════════════════
-1️⃣  本周主题/主线目标是什么？
-═══════════════════════════════════════
-建议: 技能系统重构月
-
-═══════════════════════════════════════
-2️⃣  本周必须完成的任务有哪些？
-═══════════════════════════════════════
-...
-```
-
-## 输出文件
-
-| 文件 | 路径 | 说明 |
-|------|------|------|
-| 周计划 | `docs/dashboard/weekTasks/<weekId>.yml` | 结构化 YAML 格式的周计划 |
-| Advisor | `docs/dashboard/advisor/<weekId>-start.md` | 完整上下文备份供复盘使用 |
