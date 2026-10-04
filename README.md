@@ -30,16 +30,12 @@ This collection is aim to be a one-stop collection of you are mainly working on 
 
 Hand-written for this repo. Generators and upstream sync do not rewrite these directories. `pnpm start cleanup` keeps only names listed in `manual` inside `meta.ts`.
 
-`antfu` is still named in `meta.ts`, but `skills/antfu/` is not in the tree.
+`antfu` is still named in `meta.ts`, but `skills/antfu/` is not in the tree. Day and week planners were removed. The refactor that is not done yet is in [PLAN.md](PLAN.md).
 
 | Skill | Description |
 |-------|-------------|
 | [cloudflare-sites](skills/cloudflare-sites) | New static and Nuxt sites go to Cloudflare Workers with `cf`. Do not create Pages projects, and do not copy void, paper-landing, or lig |
 | [oq](skills/oq) | Tooling and project conventions (ESLint, pnpm catalog, UnoCSS, releases) |
-| [start-my-day](skills/start-my-day) | Plan the day from the dashboard |
-| [end-my-day](skills/end-my-day) | Close the day against the plan |
-| [start-my-week](skills/start-my-week) | Plan the week |
-| [end-my-week](skills/end-my-week) | Close the week |
 
 ### Skills Generated from Official Documentation
 
