@@ -102,9 +102,5 @@ export const combos: Record<string, ComboSkillMeta> = {
 export const manual = [
   'antfu',
   'cloudflare-sites',
-  'end-my-day',
-  'end-my-week',
   'oq',
-  'start-my-day',
-  'start-my-week',
 ]
