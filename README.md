@@ -28,11 +28,18 @@ This collection is aim to be a one-stop collection of you are mainly working on 
 
 > Opinionated
 
-Manually maintained by Anthony Fu with his preferred tools, setup conventions, and best practices.
+Hand-written for this repo. Generators and upstream sync do not rewrite these directories. `pnpm start cleanup` keeps only names listed in `manual` inside `meta.ts`.
+
+`antfu` is still named in `meta.ts`, but `skills/antfu/` is not in the tree.
 
 | Skill | Description |
 |-------|-------------|
-| [antfu](skills/antfu) | Anthony Fu's preferences and best practices for app/library projects (eslint, pnpm, vitest, vue, etc.) |
+| [cloudflare-sites](skills/cloudflare-sites) | New static and Nuxt sites go to Cloudflare Workers with `cf`. Do not create Pages projects, and do not copy void, paper-landing, or lig |
+| [oq](skills/oq) | Tooling and project conventions (ESLint, pnpm catalog, UnoCSS, releases) |
+| [start-my-day](skills/start-my-day) | Plan the day from the dashboard |
+| [end-my-day](skills/end-my-day) | Close the day against the plan |
+| [start-my-week](skills/start-my-week) | Plan the week |
+| [end-my-week](skills/end-my-week) | Close the week |
 
 ### Skills Generated from Official Documentation
 
