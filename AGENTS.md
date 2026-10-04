@@ -23,7 +23,7 @@ Generate [Agent Skills](https://agentskills.io/home) from project documentation.
 | Generated skills | `skills/{project}/` | Type 1: Generated from docs |
 | Synced skills | `skills/{output-name}/` | Type 2: Copied from vendor repos |
 | Combo skills | `skills/{output}/` | Type 3: Hybrid - adapt or generate based on user needs |
-| Manual skills | `skills/antfu/` | Type 4: Hand-written |
+| Manual skills | `skills/` names in `meta.ts` `manual` | Type 4: Hand-written. Includes `cloudflare-sites` |
 | Source docs | `sources/{project}/docs/` | Git submodules (Type 1 sources) |
 | Vendor skills | `vendor/{project}/skills/` | Git submodules (Type 2 sources) |
 | Combo repos | `combo/{project}/` | Git submodules (Type 3 sources) |
@@ -57,7 +57,7 @@ combo/{project}/            # Type 3: Hybrid - adapt or generate based on user n
   ├── docs/                 # Source documentation
   └── skills/               # Optional: upstream skills to adapt
 combos/{project}.md         # Type 3: User requirements for combo generation
-skills/antfu/               # Type 4: Hand-written
+skills/cloudflare-sites/   # Type 4: Hand-written (see meta.ts manual)
 ```
 
 ### Skill Output Format
